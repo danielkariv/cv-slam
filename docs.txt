@@ -37,6 +37,9 @@
   # Git repo with a lot of examples for stuff we can do with computer vision.
   # There is a topic called MSCKF (https://www-users.cse.umn.edu/~stergios/papers/ICRA07-MSCKF.pdf)
   # Which seems to be used by Google,Facebook,Tesla,Apple and such.
+  # https://www.reddit.com/r/MachineLearning/comments/idnsm2/r_deep_learningbased_single_image_camera/
+  # A way to get intrinsic matrix using Machine Learning. There isn't another way to get it expect do it like this.
+
   # NOTES:
   # ORB is the fastest algo I found without needs in machine learning. With a single camera, it only can do 20fps or 55ms per frame, too slow for real time tracking (this on a new laptop using all of the cpu)
   # can improve performance by play with the settings but I think there is probably a better of doing it.

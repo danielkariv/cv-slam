@@ -95,7 +95,10 @@ class Extractor:
 
         return kps, des
 
-    # Not working anymore
+    def detect(self,currentDescriptors):
+        matches = self.matcher.knnMatch(self.lastDescriptors, currentDescriptors, k=2)
+        return matches
+
     def undistort_frame(self, frame):
         # undistort image
         h, w = frame.shape[:2]
@@ -106,67 +109,80 @@ class Extractor:
         frame = frame[y:y + h, x:x + w]
         return frame, newcameramtx
 
-    def process_frame(self, frame, width, height):
+    def find_good_matches(self, matches, currentKeypoints):
+        points1 = []
+        points2 = []
+        # ratio test as in Lowe's paper
+        for m in matches[:]:
+            # make sure the matcher found pair
+            if len(m) == 2:
+                (m1, m2) = m
+                if m1.distance < 0.75 * m2.distance:
+                    (x1, y1) = self.lastKeypoints[m1.queryIdx].pt
+                    (x2, y2) = currentKeypoints[m1.trainIdx].pt
+                    # be within orb distance 32
+                    if m1.distance < 32:
+                        points1.append((x1, y1))
+                        points2.append((x2, y2))
+            else:
+                print("match isn't a pair, it got ", len(m), " values.")
+
+        points1 = np.array(points1)
+        points2 = np.array(points2)
+        return points1,points2
+
+    def process_frame(self, frame, width, height, _debug = False):
         #current_frame, newcameramtx = self.undistort_frame(frame)  # cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         final_img = frame #current_frame
+        # extract keypoints,descriptors.
         currentKeypoints, currentDescriptors = self.extract(frame)
         if len(self.lastKeypoints) > 0 and len(self.lastDescriptors) > 0:
-            matches = self.matcher.knnMatch(self.lastDescriptors, currentDescriptors, k=2)
-            # draw matches.
-            final_img = cv2.drawMatchesKnn(self.lastFrame, self.lastKeypoints,frame, currentKeypoints,
-                                           matches[:10], None)
+            # detect matches with old frame.
+            matches = self.detect(currentDescriptors)
+            if _debug: # draw matches.
+                final_img = cv2.drawMatchesKnn(self.lastFrame, self.lastKeypoints,frame, currentKeypoints,
+                                               matches[:10], None)
 
-            points1 = []
-            points2 = []
-            # ratio test as in Lowe's paper
-            for m in matches[:]:
-                # make sure the matcher found pair
-                if len(m) == 2:
-                    (m1, m2) = m
-                    if m1.distance < 0.75 * m2.distance:
-                        (x1, y1) = self.lastKeypoints[m1.queryIdx].pt
-                        (x2, y2) = currentKeypoints[m1.trainIdx].pt
-                        # be within orb distance 32
-                        if m1.distance < 32:
-                            points1.append((x1, y1))
-                            points2.append((x2, y2))
-                else:
-                    print("match isn't a pair, it got ", len(m), " values.")
+            points1, points2 = self.find_good_matches(matches,currentKeypoints)
 
-            points1 = np.array(points1)
-            points2 = np.array(points2)
-            # hacking way to check if we got enough points.
+            # TODO: dirty way to check if we have enough points to find Essential Matrix (based on the RANSAC algo)
+            #       would like to clean it up.
             if len(points1) < 8 or len(points2) < 8:
                 print("not enough points to run findEssentialMat")
                 self.lastKeypoints = currentKeypoints
                 self.lastDescriptors = currentDescriptors
-                self.lastFrame = current_frame
+                self.lastFrame = frame
                 return final_img
 
-            # works with known K (camera parameters)
-            essentialMatrix, mask = cv2.findEssentialMat(points1, points2, self.k, threshold=1.0)
-
+            # TODO: add support to Fundamental Matrix (without known K).
+            # export Essential Matrix from given points and known K (camera parameters)
+            #essentialMatrix, mask = cv2.findEssentialMat(points1, points2, self.k, threshold=1.0)
+            # NOT REALLY essentialMatrix with findFundamentalMat (just lazy to move it to another position)
+            essentialMatrix, mask = cv2.findFundamentalMat(points1,points2,cv2.RANSAC,1,0.99,100)
+            # TODO: not sure if I need it anymore.
             if essentialMatrix is None:
                 print("not enough points to create essentialMatrix")
                 self.lastKeypoints = currentKeypoints
                 self.lastDescriptors = currentDescriptors
-                self.lastFrame = current_frame
+                self.lastFrame = frame
                 return final_img
 
+            # TODO: this part forward is less understood and need some cleanup + check it is right.
             # calculate the Rotation matrix and Translation vector
             points, R, t, mask = cv2.recoverPose(essentialMatrix, np.float32(points1), np.float32(points2), self.k, 4)
 
             R = np.asmatrix(R).I
 
-            # find the new camera position
+            # find the new camera position and add to list of caemra positions.
             self.cam_xyz.append([self.camPos[0] + t[0], self.camPos[1] + t[1], self.camPos[2] + t[2]])
 
             # calculate the camera matrix
             C = np.hstack((R, t))
             P = np.asmatrix(self.k) * np.asmatrix(C)
 
+            # TODO: check if it right (map looks wrong if there is a rotation movement)
             # turn the 2d landmarks into 3d points
-            for i in range(min(10, len(points2))):
+            for i in range(min(50, len(points2))):
                 # calculate the 3x1 matrix of the point
                 x_i = np.asmatrix([points2[i][0], points2[i][1], 1]).T
 
@@ -176,9 +192,8 @@ class Extractor:
                                     X_i[1][0] * self.scale + self.camPos[1],
                                     X_i[2][0] * self.scale + self.camPos[2]])
 
-            # update the camera position
+            # update the last camera position with the new one.
             self.camPos = [self.camPos[0] + t[0], self.camPos[1] + t[1], self.camPos[2] + t[2]]
-            print("camPos: ", self.camPos)
 
         self.lastKeypoints = currentKeypoints
         self.lastDescriptors = currentDescriptors
@@ -249,7 +264,7 @@ if __name__ == "__main__":
         # Load video to capture
         # TODO: change to args instead of hardcoded, and add webcam support.
         #cap = cv2.VideoCapture('IMG_6439.MOV') # local video (not uploaded)
-        cap = cv2.VideoCapture('test_countryroad.mp4')
+        cap = cv2.VideoCapture('test_drone.mp4')
         width, height = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
         extractor = Extractor(mtx, dist)
@@ -265,14 +280,14 @@ if __name__ == "__main__":
                 # frame = process_frame(frame)
                 #cut_width, cut_height = int(width // 2), int(height // 2)
                 #frame = cv2.resize(frame, (cut_width, cut_height))
-                frame = extractor.process_frame(frame, width,height)#cut_width, cut_height)
+                frame = extractor.process_frame(frame, width,height,_debug=True)#cut_width, cut_height)
                 cv2.imshow("Video", frame)
                 # cv2.setWindowProperty("Video", cv2.WND_PROP_TOPMOST, 1)
                 # Press Q on keyboard to  exit, or wait 1ms.
                 if cv2.waitKey(16) & 0xFF == ord('q'):
                     break
                 # skip every X frames.
-                for i in range(3):
+                for i in range(0):
                     cap.grab()
             else:
                 break
