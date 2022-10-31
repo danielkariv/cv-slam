@@ -1,0 +1,42 @@
+  # Stuff I collected while reseraching, with comments on the data.
+  # Little of a mess but it is my mess :d
+  # -----
+  # Better way to get points and match them. It is very fast compare to classic ways, using tensorflow (AI model).
+  # Can run in real time, ~16ms on cpu, could use gpu.
+  # Need to check if it can work with multiple cameras at once.
+  # https://arxiv.org/pdf/2007.10000.pdf (performance paper)
+  # https://www.youtube.com/watch?v=u7Yo5EtOATQ
+  # https://github.com/magicleap/SuperPointPretrainedNetwork
+  # (Downloaded it, it works on laptop, it also multicore, need to test in lower performance cpu/gpu)
+  # https://github.com/rpautrat/SuperPoint
+  # random post talking about both ways to match: https://www.linkedin.com/pulse/computer-vision-feature-matching-opencv-valentina-alto/?trk=related_artice_Computer%20Vision%3A%20Feature%20Matching%20with%20OpenCV_article-card_title
+  # https://my.eng.utah.edu/~cs6320/cv_files/Lecture3.pdf
+  # (lecture about getting camera position/rotation, aka poses)
+  # overall idea is that RANSAC is matching the points, it fails to do it in some cases so we use math's correction algos.
+  # https://www.hindawi.com/journals/jat/2021/8153474/
+  # (sums up what we need to track it)
+  # https://github.com/changh95/visual-slam-roadmap
+  # https://www.reddit.com/r/computervision/comments/l8pg5r/roadmap_to_study_visualslam/
+  # (roadmap showing general idea of what SLAM is, and what research exist on it)
+  # https://iopscience.iop.org/article/10.1088/1757-899X/782/4/042014/pdf
+  # (paper with info on what used for AR/VR)
+  # https://github.com/UZ-SLAMLab/ORB_SLAM3
+  # https://arxiv.org/pdf/2007.11898.pdf
+  # (Latest research on it, should be the best we have right now publicly)
+  # SLAM = create map and get camera position in space, VO = Visual Odometry = Get only camera position in relation to past frames.
+  # https://vision.in.tum.de/research/vslam/basalt
+  # Basalt, looks like the best VO algo we got right now. Very accurate compare to ground truth.
+  # https://github.com/introlab/rtabmap
+  # https://www.youtube.com/watch?v=71eRxTc1DaU
+  # pretty cool app/program that used to scan houses, allow to have multiple sessions and auto connect between the different maps.
+  # https://roving-robots.com/2020/06/16/feature-based-visual-slam-tutorial-part-0/
+  # guide to do with without camera calibration.
+  # https://www.youtube.com/watch?v=N451VeA8XRA
+  # guide in youtube how to do visual odometry.
+  # https://github.com/niconielsen32/ComputerVision
+  # Git repo with a lot of examples for stuff we can do with computer vision.
+  # There is a topic called MSCKF (https://www-users.cse.umn.edu/~stergios/papers/ICRA07-MSCKF.pdf)
+  # Which seems to be used by Google,Facebook,Tesla,Apple and such.
+  # NOTES:
+  # ORB is the fastest algo I found without needs in machine learning. With a single camera, it only can do 20fps or 55ms per frame, too slow for real time tracking (this on a new laptop using all of the cpu)
+  # can improve performance by play with the settings but I think there is probably a better of doing it.
